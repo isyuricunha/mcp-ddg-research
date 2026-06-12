@@ -1,0 +1,16 @@
+services:
+  ddg-research:
+    build: .
+    image: mcp-ddg-research:local
+    stdin_open: true
+    tty: false
+    volumes:
+      - ./data:/data
+    environment:
+      MCP_CACHE_DIR: /data/cache
+      DDG_CACHE_TTL_SECONDS: "21600"
+      FETCH_CACHE_TTL_SECONDS: "7200"
+      DDG_TIMEOUT_SECONDS: "15"
+      FETCH_TIMEOUT_SECONDS: "15"
+      MAX_CONCURRENCY: "5"
+      MCP_TRANSPORT: stdio
