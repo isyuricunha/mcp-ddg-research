@@ -5,9 +5,9 @@ services:
     container_name: mcp-ddg-research
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "49317:8000"
     volumes:
-      - ./data:/data
+      - ~/docker/docker-data/mcp-ddg-research:/data
     environment:
       MCP_CACHE_DIR: /data/cache
       DDG_CACHE_TTL_SECONDS: "21600"
@@ -23,4 +23,4 @@ services:
       MCP_ALLOWED_HOSTS: "*"
       MCP_ALLOWED_ORIGINS: "*"
 
-      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-change-me}
+      MCP_AUTH_TOKEN: change-me-now

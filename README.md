@@ -274,19 +274,25 @@ docker run --rm -i -v "$PWD/data:/data" mcp-ddg-research:local
 ## docker-compose Usage
 
 The included compose file starts the server in streamable HTTP mode on `/mcp`.
-It exposes port `8000` and requires `Authorization: Bearer <token>` when
-`MCP_AUTH_TOKEN` is set.
+It maps host port `49317` to container port `8000` and requires
+`Authorization: Bearer change-me-now` by default.
 
 Build and start the service:
 
 ```bash
-export MCP_AUTH_TOKEN="replace-with-a-long-random-token"
 docker compose up --build ddg-research
 ```
 
-If `MCP_AUTH_TOKEN` is not exported, compose uses the local placeholder token
-`change-me`. That is acceptable for a quick local smoke test only. Replace it
-before using LAN, VPN, or reverse-proxy deployments.
+The compose file persists cache data at:
+
+```text
+~/docker/docker-data/mcp-ddg-research/cache
+```
+
+The checked-in compose token is the placeholder `change-me-now`. It is
+acceptable for local smoke tests only. Replace `MCP_AUTH_TOKEN` in
+`docker-compose.yml` before using LAN, VPN, reverse-proxy, or Cloudflare Tunnel
+deployments.
 
 The compose file defaults `MCP_ALLOWED_HOSTS=*` and `MCP_ALLOWED_ORIGINS=*` so
 the same container can run behind a LAN IP, hostname, domain, reverse proxy, or
@@ -296,23 +302,22 @@ Host/Origin allowlist and relies on the bearer token. To enable strict
 Host/Origin checks, set exact comma-separated values such as:
 
 ```bash
-MCP_ALLOWED_HOSTS="example.com,example.com:443,localhost:8000"
+MCP_ALLOWED_HOSTS="example.com,example.com:443,localhost:49317"
 MCP_ALLOWED_ORIGINS="https://example.com,http://localhost:*"
 ```
 
 ### LAN HTTP Example
 
-Set a real token and start the server:
+Set a real token in `docker-compose.yml` and start the server:
 
 ```bash
-export MCP_AUTH_TOKEN="replace-with-a-long-random-token"
 docker compose up -d --build
 ```
 
 Use your server's LAN IP in the client URL:
 
 ```text
-http://YOUR_SERVER_IP:8000/mcp
+http://YOUR_SERVER_IP:49317/mcp
 ```
 
 OpenCode remote MCP configuration for a LAN deployment:
@@ -323,10 +328,10 @@ OpenCode remote MCP configuration for a LAN deployment:
     "ddg-research": {
       "type": "remote",
       "enabled": true,
-      "url": "http://YOUR_SERVER_IP:8000/mcp",
+      "url": "http://YOUR_SERVER_IP:49317/mcp",
       "oauth": false,
       "headers": {
-        "Authorization": "Bearer replace-with-a-long-random-token"
+        "Authorization": "Bearer change-me-now"
       }
     }
   }
@@ -336,14 +341,14 @@ OpenCode remote MCP configuration for a LAN deployment:
 ### HTTPS Reverse Proxy Example
 
 Run the container on the server and terminate TLS in a reverse proxy. The proxy
-should forward `/mcp` to `http://127.0.0.1:8000/mcp` and preserve standard
+should forward `/mcp` to `http://127.0.0.1:49317/mcp` and preserve standard
 upgrade/streaming behavior.
 
 Minimal Nginx-style location:
 
 ```nginx
 location /mcp {
-    proxy_pass http://127.0.0.1:8000/mcp;
+    proxy_pass http://127.0.0.1:49317/mcp;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -363,12 +368,71 @@ OpenCode configuration for the HTTPS endpoint:
       "url": "https://your-domain.example/mcp",
       "oauth": false,
       "headers": {
-        "Authorization": "Bearer replace-with-a-long-random-token"
+        "Authorization": "Bearer change-me-now"
       }
     }
   }
 }
 ```
+
+### Cloudflare Tunnel Example
+
+Cloudflare Tunnel lets `cloudflared` make outbound-only connections from your
+server to Cloudflare, so you can publish the MCP HTTP endpoint without opening
+an inbound router/firewall port.
+
+In the Cloudflare dashboard, create a tunnel and add a public hostname such as:
+
+```text
+https://mcp.example.com
+```
+
+If `cloudflared` runs on the host, set the tunnel service URL to:
+
+```text
+http://127.0.0.1:49317
+```
+
+If `cloudflared` runs as another service in the same compose project/network,
+set the tunnel service URL to the container service name and internal port:
+
+```text
+http://ddg-research:8000
+```
+
+Minimal compose service example for token-managed tunnels:
+
+```yaml
+cloudflared:
+  image: cloudflare/cloudflared:latest
+  restart: unless-stopped
+  command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+  depends_on:
+    - ddg-research
+```
+
+Keep `CLOUDFLARE_TUNNEL_TOKEN` outside version control. In OpenCode, use the
+public HTTPS URL and keep the MCP bearer token header:
+
+```json
+{
+  "mcp": {
+    "ddg-research": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://mcp.example.com/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer change-me-now"
+      }
+    }
+  }
+}
+```
+
+For production, replace `change-me-now` with a long random token. Cloudflare
+Tunnel protects the network path, but the MCP server should still require its
+own bearer token.
 
 Do not expose HTTP mode to an untrusted network without HTTPS and a strong
 `MCP_AUTH_TOKEN`. If `MCP_AUTH_TOKEN` is unset in HTTP mode, the server logs a
@@ -385,19 +449,19 @@ not send the MCP client's expected `Accept: text/event-stream` negotiation
 headers. That still proves the request passed bearer-token auth and Host
 validation.
 
-With the compose server running and `MCP_AUTH_TOKEN=replace-with-a-long-random-token`:
+With the compose server running and the default compose token:
 
 ```bash
-curl -i http://127.0.0.1:8000/mcp
+curl -i http://127.0.0.1:49317/mcp
 ```
 
 Expected: `401 Unauthorized`.
 
 ```bash
 curl -i \
-  -H "Host: YOUR_SERVER_IP:8000" \
-  -H "Authorization: Bearer replace-with-a-long-random-token" \
-  http://127.0.0.1:8000/mcp
+  -H "Host: YOUR_SERVER_IP:49317" \
+  -H "Authorization: Bearer change-me-now" \
+  http://127.0.0.1:49317/mcp
 ```
 
 Expected: usually `406 Not Acceptable` from raw curl, but not `401 Unauthorized`
@@ -420,7 +484,7 @@ Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
 | `MCP_TRANSPORT` | `stdio` | MCP transport. `stdio` is the default. `http` uses streamable HTTP when supported by the installed SDK. |
 | `MCP_HOST` | `0.0.0.0` | Host used for optional streamable HTTP mode. |
 | `MCP_PORT` | `8000` | Port used for optional streamable HTTP mode. |
-| `MCP_AUTH_TOKEN` | unset | Bearer token for HTTP mode. If set, every HTTP request must send `Authorization: Bearer <token>`. If unset, HTTP mode logs a warning and runs without auth. |
+| `MCP_AUTH_TOKEN` | unset | Bearer token for HTTP mode. The included compose file sets this to `change-me-now`; replace it before real deployments. If unset, HTTP mode logs a warning and runs without auth. |
 | `MCP_ALLOWED_HOSTS` | `*` | Comma-separated Host allowlist for HTTP mode. `*` supports arbitrary deployment hosts by disabling SDK Host/Origin rebinding checks. |
 | `MCP_ALLOWED_ORIGINS` | `*` | Comma-separated Origin allowlist for HTTP mode. `*` supports arbitrary origins by disabling SDK Host/Origin rebinding checks. |
 
@@ -430,7 +494,8 @@ Search results are cached under the `search` cache namespace. Fetch responses ar
 
 Cache files are written atomically by writing a temporary file in the target cache directory and then renaming it into place. Corrupt, malformed, or expired cache files are ignored safely.
 
-The default Docker configuration persists cache files in `/data/cache`, with `./data` mounted into the container.
+The default compose configuration persists cache files in `/data/cache`, with
+`~/docker/docker-data/mcp-ddg-research` mounted into the container.
 
 ## Rate Limit Notes
 
@@ -552,9 +617,10 @@ Use conventional commits to drive release versions:
 - `docs:`, `ci:`, `chore:`, `test:`, `style:`, and `refactor:` do not create a
   release by default.
 
-The release workflow updates `pyproject.toml`, `src/mcp_ddg_research/__init__.py`,
-and `CHANGELOG.md` during the release commit. It is intentionally skipped for
-documentation-only pushes and compose-file-only pushes.
+The release workflow updates `pyproject.toml` and
+`src/mcp_ddg_research/__init__.py` during semantic-release commits. It does not
+maintain a changelog file. It is intentionally skipped for documentation-only
+pushes and compose-file-only pushes.
 
 Manual milestone releases are also supported. Create and push a `vX.Y.Z` tag
 that points at the intended release commit, and the tag workflow publishes the
