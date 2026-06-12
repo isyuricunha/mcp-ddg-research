@@ -181,6 +181,7 @@ async def web_fetch(
 async def ddg_deep_search(
     query: str,
     max_results: int = 10,
+    search_window: int | None = None,
     max_pages: int = 5,
     max_chars_per_page: int = 12000,
     safe_search: str = "off",
@@ -193,6 +194,7 @@ async def ddg_deep_search(
     request = DeepSearchRequest(
         query=query,
         max_results=max_results,
+        search_window=search_window,
         max_pages=max_pages,
         max_chars_per_page=max_chars_per_page,
         safe_search=safe_search,
@@ -205,6 +207,7 @@ async def ddg_deep_search(
     search_response = await ddg_search(
         query=request.query,
         max_results=request.max_results,
+        search_window=request.search_window,
         safe_search=request.safe_search,
         time_filter=request.time_filter,
         blocked_domains=request.blocked_domains,

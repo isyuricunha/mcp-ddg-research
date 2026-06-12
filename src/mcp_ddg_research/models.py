@@ -20,6 +20,7 @@ class StrictBaseModel(BaseModel):
 class SearchRequest(StrictBaseModel):
     query: str = Field(min_length=1)
     max_results: int = Field(default=10, ge=1, le=30)
+    search_window: int | None = Field(default=None, ge=1, le=100)
     safe_search: SafeSearch = "off"
     time_filter: TimeFilter | None = None
     blocked_domains: list[str] = Field(default_factory=list)
@@ -40,6 +41,7 @@ class FetchRequest(StrictBaseModel):
 class DeepSearchRequest(StrictBaseModel):
     query: str = Field(min_length=1)
     max_results: int = Field(default=10, ge=1, le=30)
+    search_window: int | None = Field(default=None, ge=1, le=100)
     max_pages: int = Field(default=5, ge=1, le=10)
     max_chars_per_page: int = Field(default=12000, ge=1000, le=50000)
     safe_search: SafeSearch = "off"

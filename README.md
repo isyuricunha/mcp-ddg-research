@@ -48,6 +48,7 @@ Arguments:
 {
   "query": "python mcp server fastmcp",
   "max_results": 10,
+  "search_window": null,
   "safe_search": "off",
   "time_filter": "month",
   "blocked_domains": [],
@@ -60,6 +61,8 @@ Argument rules:
 
 - `query`: string, required.
 - `max_results`: integer, default `10`, minimum `1`, maximum `30`.
+- `search_window`: optional integer, minimum `1`, maximum `100`. If provided,
+  this is the provider request size before dedupe/domain controls/final cap.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
 - `time_filter`: optional, one of `day`, `week`, `month`, `year`.
 - `blocked_domains`: optional list of domains to remove from results, default `[]`.
@@ -127,6 +130,7 @@ Arguments:
 {
   "query": "model context protocol python sdk",
   "max_results": 10,
+  "search_window": null,
   "max_pages": 5,
   "max_chars_per_page": 12000,
   "safe_search": "off",
@@ -142,6 +146,8 @@ Argument rules:
 
 - `query`: string, required.
 - `max_results`: integer, default `10`, minimum `1`, maximum `30`.
+- `search_window`: optional integer, minimum `1`, maximum `100`. Passed through
+  to `ddg_search` as the provider request size before final result capping.
 - `max_pages`: integer, default `5`, minimum `1`, maximum `10`.
 - `max_chars_per_page`: integer, default `12000`, minimum `1000`, maximum `50000`.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
@@ -180,9 +186,23 @@ Response example:
 ## Domain Controls
 
 Domain controls are opt-in. If you do not pass `blocked_domains`,
-`allowed_domains`, or `preferred_domains`, search results preserve DuckDuckGo's
+`allowed_domains`, `preferred_domains`, or `search_window`, `ddg_search`
+requests exactly `max_results` from DuckDuckGo and preserves DuckDuckGo's
 default ranking order after URL deduplication. The server does not apply a
 built-in source bias, source boost, or domain blocklist.
+
+When any domain control is provided, the server requests a larger internal
+window from the provider before applying dedupe and domain controls. The default
+window is:
+
+```text
+min(max_results * 3, 50)
+```
+
+The final response is still capped to `max_results`. You can override the
+provider request size with `search_window`, minimum `1`, maximum `100`. This is
+useful when a desired allowed/preferred domain might appear outside the first
+`max_results` provider results.
 
 Domain inputs are normalized by lowercasing, removing URL schemes, removing
 paths and query strings, and stripping a leading `www.`. Matching supports exact
@@ -223,6 +243,29 @@ Prefer domains without excluding others:
 {
   "query": "duckduckgo html search endpoint",
   "preferred_domains": ["duckduckgo.com", "github.com"]
+}
+```
+
+Search a larger internal window before applying domain controls:
+
+```json
+{
+  "query": "python mcp server",
+  "max_results": 10,
+  "search_window": 40,
+  "allowed_domains": ["github.com", "modelcontextprotocol.io"]
+}
+```
+
+Deep search with the same search window behavior:
+
+```json
+{
+  "query": "model context protocol python sdk",
+  "max_results": 10,
+  "max_pages": 5,
+  "search_window": 40,
+  "preferred_domains": ["github.com"]
 }
 ```
 

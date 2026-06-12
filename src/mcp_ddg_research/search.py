@@ -19,6 +19,8 @@ DDGS_SAFE_SEARCH = {"off": "off", "moderate": "moderate", "strict": "on"}
 HTML_SAFE_SEARCH = {"off": "-2", "moderate": "-1", "strict": "1"}
 TIME_FILTERS = {"day": "d", "week": "w", "month": "m", "year": "y"}
 DEFAULT_DDG_TIMEOUT_SECONDS = 15
+DEFAULT_DOMAIN_CONTROL_WINDOW_MULTIPLIER = 3
+DEFAULT_DOMAIN_CONTROL_WINDOW_CAP = 50
 SEARCH_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -32,6 +34,25 @@ SEARCH_HEADERS = {
 
 def get_ddg_timeout_seconds() -> int:
     return get_env_int("DDG_TIMEOUT_SECONDS", DEFAULT_DDG_TIMEOUT_SECONDS)
+
+
+def has_domain_controls(request: SearchRequest) -> bool:
+    return bool(
+        request.allowed_domains
+        or request.blocked_domains
+        or request.preferred_domains
+    )
+
+
+def provider_request_size(request: SearchRequest) -> int:
+    if request.search_window is not None:
+        return request.search_window
+    if has_domain_controls(request):
+        return min(
+            request.max_results * DEFAULT_DOMAIN_CONTROL_WINDOW_MULTIPLIER,
+            DEFAULT_DOMAIN_CONTROL_WINDOW_CAP,
+        )
+    return request.max_results
 
 
 def resolve_duckduckgo_redirect_url(href: str) -> str:
@@ -93,10 +114,11 @@ def _search_with_ddgs(request: SearchRequest, timeout_seconds: int) -> list[Sear
     from ddgs import DDGS
 
     timelimit = TIME_FILTERS.get(request.time_filter) if request.time_filter else None
+    request_size = provider_request_size(request)
     with DDGS(timeout=timeout_seconds) as ddgs:
         raw_results = ddgs.text(
             request.query,
-            max_results=request.max_results,
+            max_results=request_size,
             timelimit=timelimit,
             safesearch=DDGS_SAFE_SEARCH[request.safe_search],
         )
@@ -143,7 +165,7 @@ async def _search_with_html_fallback(
     ) as client:
         response = await client.get(DUCKDUCKGO_HTML_URL, params=params)
         response.raise_for_status()
-    return parse_duckduckgo_html_results(response.text, request.max_results)
+    return parse_duckduckgo_html_results(response.text, provider_request_size(request))
 
 
 def _cache_payload(request: SearchRequest) -> dict[str, Any]:
@@ -171,6 +193,7 @@ def apply_search_domain_controls(
 async def ddg_search(
     query: str,
     max_results: int = 10,
+    search_window: int | None = None,
     safe_search: str = "off",
     time_filter: str | None = None,
     blocked_domains: list[str] | None = None,
@@ -182,6 +205,7 @@ async def ddg_search(
     request = SearchRequest(
         query=query,
         max_results=max_results,
+        search_window=search_window,
         safe_search=safe_search,
         time_filter=time_filter,
         blocked_domains=blocked_domains or [],

@@ -142,6 +142,7 @@ async def _run_http_async() -> None:
 async def ddg_search(
     query: str,
     max_results: int = 10,
+    search_window: int | None = None,
     safe_search: str = "off",
     time_filter: str | None = None,
     blocked_domains: list[str] | None = None,
@@ -153,6 +154,7 @@ async def ddg_search(
     response = await perform_ddg_search(
         query=query,
         max_results=max_results,
+        search_window=search_window,
         safe_search=safe_search,
         time_filter=time_filter,
         blocked_domains=blocked_domains,
@@ -174,6 +176,7 @@ async def web_fetch(url: str, max_chars: int = 12000) -> dict:
 async def ddg_deep_search(
     query: str,
     max_results: int = 10,
+    search_window: int | None = None,
     max_pages: int = 5,
     max_chars_per_page: int = 12000,
     safe_search: str = "off",
@@ -188,6 +191,7 @@ async def ddg_deep_search(
     response = await perform_deep_search(
         query=query,
         max_results=max_results,
+        search_window=search_window,
         max_pages=max_pages,
         max_chars_per_page=max_chars_per_page,
         safe_search=safe_search,
