@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1
+
+- Add GitHub Actions release automation for validation, semantic releases, and multi-architecture Docker image publishing.
+- Publish release images to Docker Hub as `mcp-ddg-research` under the configured Docker Hub namespace and to GitHub Container Registry under the repository path.
+- Correct package metadata to use `https://github.com/isyuricunha/mcp-ddg-research`.
+
 ## v0.3.0
 
 - Add opt-in `blocked_domains`, `allowed_domains`, and `preferred_domains` controls for `ddg_search` and `ddg_deep_search`.

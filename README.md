@@ -513,6 +513,48 @@ python -m pip install build
 python -m build
 ```
 
+## Release Automation
+
+Releases are automated by `.github/workflows/release.yml` when commits are
+pushed to `main`. The workflow is Python-native:
+
+1. Install the project with development dependencies.
+2. Run Ruff, pytest, compile checks, Python package build, and a Docker build.
+3. Use Python Semantic Release to create the next GitHub release from
+   conventional commits.
+4. If a release is created, build and push multi-architecture Docker images for
+   `linux/amd64` and `linux/arm64`.
+
+The workflow publishes these image tags:
+
+```text
+DOCKERHUB_USERNAME/mcp-ddg-research:latest
+DOCKERHUB_USERNAME/mcp-ddg-research:vX.Y.Z
+ghcr.io/isyuricunha/mcp-ddg-research:latest
+ghcr.io/isyuricunha/mcp-ddg-research:vX.Y.Z
+```
+
+Required repository secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | Docker Hub namespace for the published image. |
+| `DOCKERHUB_TOKEN` | Docker Hub access token used by `docker/login-action`. |
+| `GITHUB_TOKEN` | Provided automatically by GitHub Actions for GitHub releases and GHCR publishing. |
+
+Use conventional commits to drive release versions:
+
+- `fix: ...` and `perf: ...` create patch releases.
+- `feat: ...` creates minor releases while the project is in `0.x`.
+- Breaking changes are capped to a minor release while the project is in `0.x`;
+  after `1.0.0`, they create major releases.
+- `docs:`, `ci:`, `chore:`, `test:`, `style:`, and `refactor:` do not create a
+  release by default.
+
+The release workflow updates `pyproject.toml`, `src/mcp_ddg_research/__init__.py`,
+and `CHANGELOG.md` during the release commit. It is intentionally skipped for
+documentation-only pushes and compose-file-only pushes.
+
 ## Limitations
 
 - DuckDuckGo HTML fallback does not support every option exposed by DuckDuckGo's full web interface.

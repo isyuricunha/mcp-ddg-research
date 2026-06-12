@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-ddg-research"
-version = "0.3.0"
+version = "0.3.1"
 description = "Lightweight MCP server for DuckDuckGo search with HTML fallback, safe webpage fetching, caching, and clean text extraction."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mcp-ddg-research/mcp-ddg-research"
+Homepage = "https://github.com/isyuricunha/mcp-ddg-research"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_ddg_research"]
@@ -41,3 +41,24 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.semantic_release]
+allow_zero_version = true
+build_command = "python -m pip install build && python -m build"
+commit_message = "chore(release): {version} [skip ci]"
+commit_parser = "conventional"
+major_on_zero = false
+tag_format = "v{version}"
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/mcp_ddg_research/__init__.py:__version__"]
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.changelog]
+mode = "update"
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+output_format = "md"

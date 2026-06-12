@@ -22,3 +22,9 @@
 - [x] Add pytest coverage for cache read/write behavior.
 - [x] Add pytest coverage for HTML extraction cleanup.
 - [x] Run lint, tests, package build, import checks, and Docker smoke checks.
+
+## Milestone 4 - Release automation
+
+- [x] Add GitHub Actions workflow for Python validation and semantic releases.
+- [x] Add Docker Hub and GitHub Container Registry image publishing on release.
+- [x] Document required release secrets and image tags.
