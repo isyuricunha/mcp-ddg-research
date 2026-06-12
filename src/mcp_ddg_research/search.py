@@ -10,6 +10,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from mcp_ddg_research.cache import JsonFileCache, build_search_cache, get_env_int
+from mcp_ddg_research.domains import apply_domain_controls
 from mcp_ddg_research.models import SearchRequest, SearchResponse, SearchResult
 from mcp_ddg_research.text import normalize_whitespace
 
@@ -71,7 +72,10 @@ def _result_from_payload(payload: dict[str, Any]) -> SearchResult | None:
     return SearchResult(title=title, url=resolve_duckduckgo_redirect_url(url), snippet=snippet)
 
 
-def _dedupe_results(results: list[SearchResult], max_results: int) -> list[SearchResult]:
+def _dedupe_results(
+    results: list[SearchResult],
+    max_results: int | None = None,
+) -> list[SearchResult]:
     seen: set[str] = set()
     deduped: list[SearchResult] = []
     for result in results:
@@ -80,7 +84,7 @@ def _dedupe_results(results: list[SearchResult], max_results: int) -> list[Searc
             continue
         seen.add(normalized_url)
         deduped.append(result)
-        if len(deduped) >= max_results:
+        if max_results is not None and len(deduped) >= max_results:
             break
     return deduped
 
@@ -98,7 +102,7 @@ def _search_with_ddgs(request: SearchRequest, timeout_seconds: int) -> list[Sear
         )
     results = [_result_from_payload(result) for result in raw_results or []]
     valid_results = [result for result in results if result is not None]
-    return _dedupe_results(valid_results, request.max_results)
+    return _dedupe_results(valid_results)
 
 
 def parse_duckduckgo_html_results(html: str, max_results: int) -> list[SearchResult]:
@@ -150,11 +154,28 @@ def _cacheable_search_response(response: SearchResponse) -> dict[str, Any]:
     return response.model_copy(update={"cached": False}).model_dump(mode="json")
 
 
+def apply_search_domain_controls(
+    results: list[SearchResult],
+    request: SearchRequest,
+) -> list[SearchResult]:
+    filtered_results = apply_domain_controls(
+        results,
+        get_url=lambda result: result.url,
+        allowed_domains=request.allowed_domains,
+        blocked_domains=request.blocked_domains,
+        preferred_domains=request.preferred_domains,
+    )
+    return filtered_results[: request.max_results]
+
+
 async def ddg_search(
     query: str,
     max_results: int = 10,
     safe_search: str = "off",
     time_filter: str | None = None,
+    blocked_domains: list[str] | None = None,
+    allowed_domains: list[str] | None = None,
+    preferred_domains: list[str] | None = None,
     *,
     cache: JsonFileCache | None = None,
 ) -> SearchResponse:
@@ -163,6 +184,9 @@ async def ddg_search(
         max_results=max_results,
         safe_search=safe_search,
         time_filter=time_filter,
+        blocked_domains=blocked_domains or [],
+        allowed_domains=allowed_domains or [],
+        preferred_domains=preferred_domains or [],
     )
     cache = cache or build_search_cache()
     payload = _cache_payload(request)
@@ -174,7 +198,10 @@ async def ddg_search(
     provider_errors: list[str] = []
 
     try:
-        ddgs_results = await asyncio.to_thread(_search_with_ddgs, request, timeout_seconds)
+        ddgs_results = apply_search_domain_controls(
+            await asyncio.to_thread(_search_with_ddgs, request, timeout_seconds),
+            request,
+        )
         if ddgs_results:
             response = SearchResponse(
                 query=request.query,
@@ -190,7 +217,10 @@ async def ddg_search(
         provider_errors.append(f"ddgs failed: {exc}")
 
     try:
-        html_results = await _search_with_html_fallback(request, timeout_seconds)
+        html_results = apply_search_domain_controls(
+            await _search_with_html_fallback(request, timeout_seconds),
+            request,
+        )
         if html_results:
             response = SearchResponse(
                 query=request.query,

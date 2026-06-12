@@ -39,8 +39,10 @@ def get_fetch_timeout_seconds() -> int:
     return get_env_int("FETCH_TIMEOUT_SECONDS", DEFAULT_FETCH_TIMEOUT_SECONDS)
 
 
-def get_max_concurrency() -> int:
-    return min(get_env_int("MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY), 10)
+def get_max_concurrency(max_concurrency: int | None = None) -> int:
+    if max_concurrency is not None:
+        return max_concurrency
+    return min(get_env_int("MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY), 12)
 
 
 def _cache_payload(request: FetchRequest) -> dict[str, Any]:
@@ -183,6 +185,10 @@ async def ddg_deep_search(
     max_chars_per_page: int = 12000,
     safe_search: str = "off",
     time_filter: str | None = None,
+    blocked_domains: list[str] | None = None,
+    allowed_domains: list[str] | None = None,
+    preferred_domains: list[str] | None = None,
+    max_concurrency: int | None = None,
 ) -> DeepSearchResponse:
     request = DeepSearchRequest(
         query=query,
@@ -191,15 +197,22 @@ async def ddg_deep_search(
         max_chars_per_page=max_chars_per_page,
         safe_search=safe_search,
         time_filter=time_filter,
+        blocked_domains=blocked_domains or [],
+        allowed_domains=allowed_domains or [],
+        preferred_domains=preferred_domains or [],
+        max_concurrency=max_concurrency,
     )
     search_response = await ddg_search(
         query=request.query,
         max_results=request.max_results,
         safe_search=request.safe_search,
         time_filter=request.time_filter,
+        blocked_domains=request.blocked_domains,
+        allowed_domains=request.allowed_domains,
+        preferred_domains=request.preferred_domains,
     )
     selected_sources = search_response.results[: request.max_pages]
-    semaphore = asyncio.Semaphore(get_max_concurrency())
+    semaphore = asyncio.Semaphore(get_max_concurrency(request.max_concurrency))
 
     async def fetch_source(source_url: str) -> FetchResponse:
         async with semaphore:

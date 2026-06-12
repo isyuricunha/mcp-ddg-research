@@ -144,6 +144,9 @@ async def ddg_search(
     max_results: int = 10,
     safe_search: str = "off",
     time_filter: str | None = None,
+    blocked_domains: list[str] | None = None,
+    allowed_domains: list[str] | None = None,
+    preferred_domains: list[str] | None = None,
 ) -> dict:
     """Search DuckDuckGo using ddgs first, then the HTML fallback."""
 
@@ -152,6 +155,9 @@ async def ddg_search(
         max_results=max_results,
         safe_search=safe_search,
         time_filter=time_filter,
+        blocked_domains=blocked_domains,
+        allowed_domains=allowed_domains,
+        preferred_domains=preferred_domains,
     )
     return response.model_dump(mode="json")
 
@@ -172,6 +178,10 @@ async def ddg_deep_search(
     max_chars_per_page: int = 12000,
     safe_search: str = "off",
     time_filter: str | None = None,
+    blocked_domains: list[str] | None = None,
+    allowed_domains: list[str] | None = None,
+    preferred_domains: list[str] | None = None,
+    max_concurrency: int | None = None,
 ) -> dict:
     """Search once, fetch top pages in parallel, and return raw page text."""
 
@@ -182,6 +192,10 @@ async def ddg_deep_search(
         max_chars_per_page=max_chars_per_page,
         safe_search=safe_search,
         time_filter=time_filter,
+        blocked_domains=blocked_domains,
+        allowed_domains=allowed_domains,
+        preferred_domains=preferred_domains,
+        max_concurrency=max_concurrency,
     )
     return response.model_dump(mode="json")
 

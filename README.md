@@ -49,7 +49,10 @@ Arguments:
   "query": "python mcp server fastmcp",
   "max_results": 10,
   "safe_search": "off",
-  "time_filter": "month"
+  "time_filter": "month",
+  "blocked_domains": [],
+  "allowed_domains": [],
+  "preferred_domains": []
 }
 ```
 
@@ -59,6 +62,9 @@ Argument rules:
 - `max_results`: integer, default `10`, minimum `1`, maximum `30`.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
 - `time_filter`: optional, one of `day`, `week`, `month`, `year`.
+- `blocked_domains`: optional list of domains to remove from results, default `[]`.
+- `allowed_domains`: optional list of domains to keep, default `[]`.
+- `preferred_domains`: optional list of domains to move earlier while preserving stable order, default `[]`.
 
 Response example:
 
@@ -124,7 +130,11 @@ Arguments:
   "max_pages": 5,
   "max_chars_per_page": 12000,
   "safe_search": "off",
-  "time_filter": "year"
+  "time_filter": "year",
+  "blocked_domains": [],
+  "allowed_domains": [],
+  "preferred_domains": [],
+  "max_concurrency": null
 }
 ```
 
@@ -136,6 +146,10 @@ Argument rules:
 - `max_chars_per_page`: integer, default `12000`, minimum `1000`, maximum `50000`.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
 - `time_filter`: optional, one of `day`, `week`, `month`, `year`.
+- `blocked_domains`: optional list of domains to remove from search results before fetching, default `[]`.
+- `allowed_domains`: optional list of domains to keep before fetching, default `[]`.
+- `preferred_domains`: optional list of domains to move earlier before fetching, default `[]`.
+- `max_concurrency`: optional per-call page fetch concurrency, minimum `1`, maximum `12`. If omitted, `MAX_CONCURRENCY` is used.
 
 Response example:
 
@@ -160,6 +174,65 @@ Response example:
   ],
   "failed_pages": [],
   "cached": false
+}
+```
+
+## Domain Controls
+
+Domain controls are opt-in. If you do not pass `blocked_domains`,
+`allowed_domains`, or `preferred_domains`, search results preserve DuckDuckGo's
+default ranking order after URL deduplication. The server does not apply a
+built-in source bias, source boost, or domain blocklist.
+
+Domain inputs are normalized by lowercasing, removing URL schemes, removing
+paths and query strings, and stripping a leading `www.`. Matching supports exact
+domains and subdomains. For example, `docs.example.com` matches `example.com`,
+but `example.com.evil.com` does not.
+
+Filtering order:
+
+1. Apply `allowed_domains` if provided.
+2. Apply `blocked_domains` if provided.
+3. Apply `preferred_domains` if provided.
+
+`preferred_domains` performs a stable partition: preferred matches move earlier,
+relative order is preserved inside the preferred and non-preferred groups, and
+no numeric score is invented.
+
+Block domains:
+
+```json
+{
+  "query": "self hosted photo backup",
+  "blocked_domains": ["example.com", "old-docs.example.org"]
+}
+```
+
+Allow only specific domains:
+
+```json
+{
+  "query": "python mcp server",
+  "allowed_domains": ["github.com", "modelcontextprotocol.io"]
+}
+```
+
+Prefer domains without excluding others:
+
+```json
+{
+  "query": "duckduckgo html search endpoint",
+  "preferred_domains": ["duckduckgo.com", "github.com"]
+}
+```
+
+Limit deep-search fetch concurrency for one call:
+
+```json
+{
+  "query": "model context protocol python sdk",
+  "max_pages": 5,
+  "max_concurrency": 2
 }
 ```
 
@@ -343,7 +416,7 @@ Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
 | `FETCH_CACHE_TTL_SECONDS` | `7200` | Web fetch cache TTL in seconds. |
 | `DDG_TIMEOUT_SECONDS` | `15` | DuckDuckGo provider and fallback timeout in seconds. |
 | `FETCH_TIMEOUT_SECONDS` | `15` | Web fetch timeout in seconds. |
-| `MAX_CONCURRENCY` | `5` | Deep search page fetch concurrency limit. |
+| `MAX_CONCURRENCY` | `5` | Default deep search page fetch concurrency limit when `max_concurrency` is omitted. Runtime caps this at `12`. |
 | `MCP_TRANSPORT` | `stdio` | MCP transport. `stdio` is the default. `http` uses streamable HTTP when supported by the installed SDK. |
 | `MCP_HOST` | `0.0.0.0` | Host used for optional streamable HTTP mode. |
 | `MCP_PORT` | `8000` | Port used for optional streamable HTTP mode. |

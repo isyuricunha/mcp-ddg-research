@@ -1,7 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from mcp_ddg_research.models import SearchRequest
+from mcp_ddg_research.fetch import get_max_concurrency
+from mcp_ddg_research.models import DeepSearchRequest, SearchRequest
 from mcp_ddg_research.search import (
     parse_duckduckgo_html_results,
     resolve_duckduckgo_redirect_url,
@@ -50,3 +51,18 @@ def test_search_request_rejects_invalid_max_results() -> None:
 def test_search_request_rejects_invalid_safe_search() -> None:
     with pytest.raises(ValidationError):
         SearchRequest(query="example", safe_search="disabled")
+
+
+def test_deep_search_request_accepts_max_concurrency() -> None:
+    request = DeepSearchRequest(query="example", max_concurrency=12)
+
+    assert request.max_concurrency == 12
+
+
+def test_deep_search_request_rejects_invalid_max_concurrency() -> None:
+    with pytest.raises(ValidationError):
+        DeepSearchRequest(query="example", max_concurrency=13)
+
+
+def test_get_max_concurrency_uses_per_call_value() -> None:
+    assert get_max_concurrency(max_concurrency=3) == 3
