@@ -199,11 +199,89 @@ docker run --rm -i -v "$PWD/data:/data" mcp-ddg-research:local
 
 ## docker-compose Usage
 
+The included compose file starts the server in streamable HTTP mode on `/mcp`.
+It exposes port `8000` and requires `Authorization: Bearer <token>` because
+`MCP_AUTH_TOKEN` is set in compose.
+
 Build and start the service:
 
 ```bash
+export MCP_AUTH_TOKEN="replace-with-a-long-random-token"
 docker compose up --build ddg-research
 ```
+
+The compose file defaults `MCP_ALLOWED_HOSTS=*` and `MCP_ALLOWED_ORIGINS=*` so
+the same container can run behind a LAN IP, hostname, domain, reverse proxy, or
+HTTPS endpoint. In MCP SDK `1.27.2`, wildcard Host/Origin validation is not
+supported by the DNS rebinding middleware, so wildcard mode disables the SDK
+Host/Origin allowlist and relies on the bearer token. To enable strict
+Host/Origin checks, set exact comma-separated values such as:
+
+```bash
+MCP_ALLOWED_HOSTS="example.com,example.com:443,localhost:8000"
+MCP_ALLOWED_ORIGINS="https://example.com,http://localhost:*"
+```
+
+### LAN HTTP Example
+
+OpenCode remote MCP configuration for a LAN deployment:
+
+```json
+{
+  "mcp": {
+    "ddg-research": {
+      "type": "remote",
+      "enabled": true,
+      "url": "http://192.168.3.136:8000/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer replace-with-a-long-random-token"
+      }
+    }
+  }
+}
+```
+
+### HTTPS Reverse Proxy Example
+
+Run the container on the server and terminate TLS in a reverse proxy. The proxy
+should forward `/mcp` to `http://127.0.0.1:8000/mcp` and preserve standard
+upgrade/streaming behavior.
+
+Minimal Nginx-style location:
+
+```nginx
+location /mcp {
+    proxy_pass http://127.0.0.1:8000/mcp;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_buffering off;
+}
+```
+
+OpenCode configuration for the HTTPS endpoint:
+
+```json
+{
+  "mcp": {
+    "ddg-research": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://search-tools.example.com/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer replace-with-a-long-random-token"
+      }
+    }
+  }
+}
+```
+
+Do not expose HTTP mode to an untrusted network without HTTPS and a strong
+`MCP_AUTH_TOKEN`. If `MCP_AUTH_TOKEN` is unset in HTTP mode, the server logs a
+warning and accepts unauthenticated HTTP requests.
 
 For MCP stdio clients, direct `docker run -i` is usually simpler than compose because the client owns stdin/stdout.
 
@@ -220,6 +298,9 @@ For MCP stdio clients, direct `docker run -i` is usually simpler than compose be
 | `MCP_TRANSPORT` | `stdio` | MCP transport. `stdio` is the default. `http` uses streamable HTTP when supported by the installed SDK. |
 | `MCP_HOST` | `0.0.0.0` | Host used for optional streamable HTTP mode. |
 | `MCP_PORT` | `8000` | Port used for optional streamable HTTP mode. |
+| `MCP_AUTH_TOKEN` | unset | Optional bearer token for HTTP mode. If set, every HTTP request must send `Authorization: Bearer <token>`. |
+| `MCP_ALLOWED_HOSTS` | `*` | Comma-separated Host allowlist for HTTP mode. `*` supports arbitrary deployment hosts by disabling SDK Host/Origin rebinding checks. |
+| `MCP_ALLOWED_ORIGINS` | `*` | Comma-separated Origin allowlist for HTTP mode. `*` supports arbitrary origins by disabling SDK Host/Origin rebinding checks. |
 
 ## Cache Behavior
 

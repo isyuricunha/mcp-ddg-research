@@ -2,8 +2,10 @@ services:
   ddg-research:
     build: .
     image: mcp-ddg-research:local
-    stdin_open: true
-    tty: false
+    container_name: mcp-ddg-research
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
     volumes:
       - ./data:/data
     environment:
@@ -13,4 +15,12 @@ services:
       DDG_TIMEOUT_SECONDS: "15"
       FETCH_TIMEOUT_SECONDS: "15"
       MAX_CONCURRENCY: "5"
-      MCP_TRANSPORT: stdio
+
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8000"
+
+      MCP_ALLOWED_HOSTS: "*"
+      MCP_ALLOWED_ORIGINS: "*"
+
+      MCP_AUTH_TOKEN: "dev-token-123"
