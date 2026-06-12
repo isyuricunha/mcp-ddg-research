@@ -28,3 +28,4 @@
 - [x] Add GitHub Actions workflow for Python validation and semantic releases.
 - [x] Add Docker Hub and GitHub Container Registry image publishing on release.
 - [x] Document required release secrets and image tags.
+- [x] Publish Docker images from explicit `v*` release tag pushes.

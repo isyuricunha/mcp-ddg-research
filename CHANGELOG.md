@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.2
+
+- Publish Docker images when a `v*` release tag is pushed, so manual release tags publish to Docker Hub and GitHub Container Registry.
+- Keep semantic-release publishing for branch releases while supporting explicit milestone tags.
+
 ## v0.3.1
 
 - Add GitHub Actions release automation for validation, semantic releases, and multi-architecture Docker image publishing.

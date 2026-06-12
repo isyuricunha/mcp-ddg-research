@@ -515,15 +515,16 @@ python -m build
 
 ## Release Automation
 
-Releases are automated by `.github/workflows/release.yml` when commits are
-pushed to `main`. The workflow is Python-native:
+Releases are automated by `.github/workflows/release.yml` when commits or
+release tags are pushed. The workflow is Python-native:
 
 1. Install the project with development dependencies.
 2. Run Ruff, pytest, compile checks, Python package build, and a Docker build.
-3. Use Python Semantic Release to create the next GitHub release from
-   conventional commits.
-4. If a release is created, build and push multi-architecture Docker images for
-   `linux/amd64` and `linux/arm64`.
+3. On `main` branch pushes, use Python Semantic Release to create the next
+   GitHub release from conventional commits.
+4. On `v*` tag pushes, treat the pushed tag as the release tag.
+5. If a release or release tag is present, build and push multi-architecture
+   Docker images for `linux/amd64` and `linux/arm64`.
 
 The workflow publishes these image tags:
 
@@ -554,6 +555,10 @@ Use conventional commits to drive release versions:
 The release workflow updates `pyproject.toml`, `src/mcp_ddg_research/__init__.py`,
 and `CHANGELOG.md` during the release commit. It is intentionally skipped for
 documentation-only pushes and compose-file-only pushes.
+
+Manual milestone releases are also supported. Create and push a `vX.Y.Z` tag
+that points at the intended release commit, and the tag workflow publishes the
+same Docker Hub and GHCR tags.
 
 ## Limitations
 
