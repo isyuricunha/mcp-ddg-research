@@ -163,7 +163,7 @@ Response example:
 }
 ```
 
-## Docker Build
+## Docker Stdio Usage
 
 Build the local image:
 
@@ -171,7 +171,8 @@ Build the local image:
 docker build -t mcp-ddg-research:local .
 ```
 
-Run the server over stdio:
+Run the server over stdio. This mode is auth-free because the MCP client owns
+stdin/stdout and there is no listening network socket:
 
 ```bash
 docker run --rm -i -v "$PWD/data:/data" mcp-ddg-research:local
@@ -200,8 +201,8 @@ docker run --rm -i -v "$PWD/data:/data" mcp-ddg-research:local
 ## docker-compose Usage
 
 The included compose file starts the server in streamable HTTP mode on `/mcp`.
-It exposes port `8000` and requires `Authorization: Bearer <token>` because
-`MCP_AUTH_TOKEN` is set in compose.
+It exposes port `8000` and requires `Authorization: Bearer <token>` when
+`MCP_AUTH_TOKEN` is set.
 
 Build and start the service:
 
@@ -209,6 +210,10 @@ Build and start the service:
 export MCP_AUTH_TOKEN="replace-with-a-long-random-token"
 docker compose up --build ddg-research
 ```
+
+If `MCP_AUTH_TOKEN` is not exported, compose uses the local placeholder token
+`change-me`. That is acceptable for a quick local smoke test only. Replace it
+before using LAN, VPN, or reverse-proxy deployments.
 
 The compose file defaults `MCP_ALLOWED_HOSTS=*` and `MCP_ALLOWED_ORIGINS=*` so
 the same container can run behind a LAN IP, hostname, domain, reverse proxy, or
@@ -224,6 +229,19 @@ MCP_ALLOWED_ORIGINS="https://example.com,http://localhost:*"
 
 ### LAN HTTP Example
 
+Set a real token and start the server:
+
+```bash
+export MCP_AUTH_TOKEN="replace-with-a-long-random-token"
+docker compose up -d --build
+```
+
+Use your server's LAN IP in the client URL:
+
+```text
+http://YOUR_SERVER_IP:8000/mcp
+```
+
 OpenCode remote MCP configuration for a LAN deployment:
 
 ```json
@@ -232,7 +250,7 @@ OpenCode remote MCP configuration for a LAN deployment:
     "ddg-research": {
       "type": "remote",
       "enabled": true,
-      "url": "http://192.168.3.136:8000/mcp",
+      "url": "http://YOUR_SERVER_IP:8000/mcp",
       "oauth": false,
       "headers": {
         "Authorization": "Bearer replace-with-a-long-random-token"
@@ -269,7 +287,7 @@ OpenCode configuration for the HTTPS endpoint:
     "ddg-research": {
       "type": "remote",
       "enabled": true,
-      "url": "https://search-tools.example.com/mcp",
+      "url": "https://your-domain.example/mcp",
       "oauth": false,
       "headers": {
         "Authorization": "Bearer replace-with-a-long-random-token"
@@ -285,6 +303,37 @@ warning and accepts unauthenticated HTTP requests.
 
 For MCP stdio clients, direct `docker run -i` is usually simpler than compose because the client owns stdin/stdout.
 
+## HTTP Smoke Tests
+
+Raw `curl` is useful for checking HTTP authentication and Host handling, but it
+does not perform a complete MCP streamable HTTP session. A request with the
+correct bearer token may therefore return `406 Not Acceptable` because curl did
+not send the MCP client's expected `Accept: text/event-stream` negotiation
+headers. That still proves the request passed bearer-token auth and Host
+validation.
+
+With the compose server running and `MCP_AUTH_TOKEN=replace-with-a-long-random-token`:
+
+```bash
+curl -i http://127.0.0.1:8000/mcp
+```
+
+Expected: `401 Unauthorized`.
+
+```bash
+curl -i \
+  -H "Host: YOUR_SERVER_IP:8000" \
+  -H "Authorization: Bearer replace-with-a-long-random-token" \
+  http://127.0.0.1:8000/mcp
+```
+
+Expected: usually `406 Not Acceptable` from raw curl, but not `401 Unauthorized`
+and not `421 Misdirected Request`.
+
+With a real MCP client, such as OpenCode configured with the same URL and
+Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
+`web_fetch`, and `ddg_deep_search`.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -298,7 +347,7 @@ For MCP stdio clients, direct `docker run -i` is usually simpler than compose be
 | `MCP_TRANSPORT` | `stdio` | MCP transport. `stdio` is the default. `http` uses streamable HTTP when supported by the installed SDK. |
 | `MCP_HOST` | `0.0.0.0` | Host used for optional streamable HTTP mode. |
 | `MCP_PORT` | `8000` | Port used for optional streamable HTTP mode. |
-| `MCP_AUTH_TOKEN` | unset | Optional bearer token for HTTP mode. If set, every HTTP request must send `Authorization: Bearer <token>`. |
+| `MCP_AUTH_TOKEN` | unset | Bearer token for HTTP mode. If set, every HTTP request must send `Authorization: Bearer <token>`. If unset, HTTP mode logs a warning and runs without auth. |
 | `MCP_ALLOWED_HOSTS` | `*` | Comma-separated Host allowlist for HTTP mode. `*` supports arbitrary deployment hosts by disabling SDK Host/Origin rebinding checks. |
 | `MCP_ALLOWED_ORIGINS` | `*` | Comma-separated Origin allowlist for HTTP mode. `*` supports arbitrary origins by disabling SDK Host/Origin rebinding checks. |
 
