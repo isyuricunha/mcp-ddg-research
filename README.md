@@ -340,12 +340,14 @@ acceptable for local smoke tests only. Replace `MCP_AUTH_TOKEN` in
 `docker-compose.yml` before using LAN, VPN, reverse-proxy, or Cloudflare Tunnel
 deployments.
 
-The compose file defaults `MCP_ALLOWED_HOSTS=*` and `MCP_ALLOWED_ORIGINS=*` so
-the same container can run behind a LAN IP, hostname, domain, reverse proxy, or
-HTTPS endpoint. In MCP SDK `1.27.2`, wildcard Host/Origin validation is not
-supported by the DNS rebinding middleware, so wildcard mode disables the SDK
-Host/Origin allowlist and relies on the bearer token. To enable strict
-Host/Origin checks, set exact comma-separated values such as:
+The server defaults `MCP_ALLOWED_HOSTS=*` and `MCP_ALLOWED_ORIGINS=*` so the
+same container can run behind a LAN IP, hostname, domain, reverse proxy, or
+HTTPS endpoint. The compose file documents these optional variables as commented
+examples. In MCP SDK `1.27.2`, wildcard Host/Origin validation is not supported
+by the DNS rebinding middleware, so wildcard mode disables the SDK Host/Origin
+allowlist and relies on the bearer token. To enable strict Host/Origin checks,
+uncomment the variables in `docker-compose.yml` and set exact comma-separated
+values such as:
 
 ```bash
 MCP_ALLOWED_HOSTS="example.com,example.com:443,localhost:49317"

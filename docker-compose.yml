@@ -9,18 +9,33 @@ services:
     volumes:
       - ~/docker/docker-data/mcp-ddg-research:/data
     environment:
-      MCP_CACHE_DIR: /data/cache
-      DDG_CACHE_TTL_SECONDS: "21600"
-      FETCH_CACHE_TTL_SECONDS: "7200"
-      DDG_TIMEOUT_SECONDS: "15"
-      FETCH_TIMEOUT_SECONDS: "15"
-      MAX_CONCURRENCY: "5"
-
+      # Required for Docker/LAN HTTP mode. The image defaults to stdio, so
+      # compose explicitly enables streamable HTTP and binds inside the container.
       MCP_TRANSPORT: http
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8000"
 
-      MCP_ALLOWED_HOSTS: "*"
-      MCP_ALLOWED_ORIGINS: "*"
-
+      # Required for HTTP mode in this compose file. Replace before exposing
+      # the service outside a trusted local network.
       MCP_AUTH_TOKEN: change-me-now
+
+      # Optional: host/origin allowlists for FastMCP DNS rebinding protection.
+      # The server defaults to "*" for flexible LAN, tunnel, and reverse-proxy use.
+      # Use comma-separated values for stricter deployments.
+      # MCP_ALLOWED_HOSTS: "*"
+      # MCP_ALLOWED_ORIGINS: "*"
+
+      # Optional: cache directory inside the container. The mounted /data volume
+      # persists this path; the image default is /data/cache.
+      # MCP_CACHE_DIR: /data/cache
+
+      # Optional: cache TTLs in seconds.
+      # DDG_CACHE_TTL_SECONDS: "21600"
+      # FETCH_CACHE_TTL_SECONDS: "7200"
+
+      # Optional: network timeouts in seconds.
+      # DDG_TIMEOUT_SECONDS: "15"
+      # FETCH_TIMEOUT_SECONDS: "15"
+
+      # Optional: default deep-search page fetch concurrency, capped at 12.
+      # MAX_CONCURRENCY: "5"
