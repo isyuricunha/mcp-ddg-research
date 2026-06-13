@@ -17,6 +17,7 @@ The MCP client or agent is responsible for reasoning over the returned data. Thi
 - Follows redirects manually and validates every redirect target.
 - Extracts clean text from HTML by removing script, style, navigation, footer, and similar boilerplate.
 - Caches search and fetch responses in a file-based JSON cache.
+- Prunes expired, corrupt, temporary, old, and oversized cache files.
 - Provides a simple deep search tool that searches once and fetches top result pages concurrently.
 
 ## What This Project Does Not Do
@@ -185,6 +186,86 @@ Response example:
 }
 ```
 
+### `cache_stats`
+
+Return current cache file counts and byte totals for each cache namespace.
+
+Arguments: none.
+
+Response example:
+
+```json
+{
+  "cache_dir": "/data/cache",
+  "namespaces": {
+    "search": {"files": 10, "bytes": 12345},
+    "fetch": {"files": 20, "bytes": 98765}
+  },
+  "total_files": 30,
+  "total_bytes": 111110
+}
+```
+
+### `cache_prune`
+
+Manually run cache pruning using the same rules as automatic pruning.
+
+Arguments:
+
+```json
+{
+  "expired_only": false,
+  "dry_run": false
+}
+```
+
+Argument rules:
+
+- `expired_only`: boolean, default `false`. When `true`, deletes expired,
+  corrupt, and temporary files but skips size-limit pruning.
+- `dry_run`: boolean, default `false`. When `true`, reports files that would be
+  deleted without deleting them.
+
+Response example:
+
+```json
+{
+  "deleted_files": 5,
+  "deleted_bytes": 123456,
+  "remaining_files": 25,
+  "remaining_bytes": 99999,
+  "dry_run": false
+}
+```
+
+### `cache_clear`
+
+Clear one cache namespace, or all cache namespaces, when explicitly confirmed.
+
+Arguments:
+
+```json
+{
+  "namespace": "fetch",
+  "confirm": true
+}
+```
+
+Argument rules:
+
+- `namespace`: one of `search`, `fetch`, or `all`.
+- `confirm`: must be `true` to delete files.
+
+Response example:
+
+```json
+{
+  "namespace": "fetch",
+  "deleted_files": 20,
+  "deleted_bytes": 98765
+}
+```
+
 ## Domain Controls
 
 Domain controls are opt-in. If you do not pass `blocked_domains`,
@@ -333,6 +414,15 @@ The compose file persists cache data at:
 
 ```text
 ~/docker/docker-data/mcp-ddg-research/cache
+```
+
+It also enables conservative cache pruning defaults:
+
+```yaml
+CACHE_PRUNE_ON_START: "true"
+CACHE_PRUNE_INTERVAL_SECONDS: "3600"
+CACHE_MAX_AGE_SECONDS: "604800"
+CACHE_MAX_SIZE_MB: "512"
 ```
 
 The checked-in compose token is the placeholder `change-me-now`. It is
@@ -517,7 +607,8 @@ and not `421 Misdirected Request`.
 
 With a real MCP client, such as OpenCode configured with the same URL and
 Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
-`web_fetch`, and `ddg_deep_search`.
+`web_fetch`, `ddg_deep_search`, `cache_stats`, `cache_prune`, and
+`cache_clear`.
 
 ## Environment Variables
 
@@ -535,12 +626,46 @@ Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
 | `MCP_AUTH_TOKEN` | unset | Bearer token for HTTP mode. The included compose file sets this to `change-me-now`; replace it before real deployments. If unset, HTTP mode logs a warning and runs without auth. |
 | `MCP_ALLOWED_HOSTS` | `*` | Comma-separated Host allowlist for HTTP mode. `*` supports arbitrary deployment hosts by disabling SDK Host/Origin rebinding checks. |
 | `MCP_ALLOWED_ORIGINS` | `*` | Comma-separated Origin allowlist for HTTP mode. `*` supports arbitrary origins by disabling SDK Host/Origin rebinding checks. |
+| `CACHE_PRUNE_ON_START` | `true` | Run cache pruning once when the MCP server starts. |
+| `CACHE_PRUNE_INTERVAL_SECONDS` | `3600` | Minimum interval between opportunistic runtime prune attempts triggered by cache access/write. |
+| `CACHE_MAX_AGE_SECONDS` | unset | Optional maximum cache file age in seconds. If unset, invalid, or `0`, max-age pruning is disabled. The compose file sets `604800` (7 days). |
+| `CACHE_MAX_SIZE_MB` | unset | Optional total cache size limit in MiB. If unset, invalid, or `0`, size-based pruning is disabled. The compose file sets `512`. |
 
 ## Cache Behavior
 
 Search results are cached under the `search` cache namespace. Fetch responses are cached under the `fetch` cache namespace. Cache keys are SHA256 hashes of stable JSON payloads, so equivalent tool arguments map to the same file path.
 
 Cache files are written atomically by writing a temporary file in the target cache directory and then renaming it into place. Corrupt, malformed, or expired cache files are ignored safely.
+
+TTL checks on read prevent stale cache values from being returned, but TTL on
+read alone does not remove old files from disk. Long-running deployments can
+therefore accumulate expired cache files unless pruning deletes them. This
+server prunes cache files on startup when `CACHE_PRUNE_ON_START=true` and also
+opportunistically during cache access/write, throttled by
+`CACHE_PRUNE_INTERVAL_SECONDS`.
+
+Pruning covers both known cache namespaces:
+
+- `search`
+- `fetch`
+
+Pruning deletes:
+
+- corrupt or malformed `.json` cache files
+- leftover `.tmp` files from interrupted atomic writes
+- files expired by `DDG_CACHE_TTL_SECONDS` or `FETCH_CACHE_TTL_SECONDS`
+- files older than `CACHE_MAX_AGE_SECONDS`, when set
+- oldest cache files first when total cache size exceeds `CACHE_MAX_SIZE_MB`
+
+If `CACHE_MAX_AGE_SECONDS` is unset, invalid, or `0`, max-age pruning is
+disabled. If `CACHE_MAX_SIZE_MB` is unset, invalid, or `0`, size-based pruning
+is disabled. Pruning errors are logged and do not fail search or fetch requests.
+
+Manual cache tools are available:
+
+- `cache_stats`: inspect current file counts and byte totals.
+- `cache_prune`: run pruning manually, with optional `dry_run`.
+- `cache_clear`: clear `search`, `fetch`, or `all` after `confirm=true`.
 
 The default compose configuration persists cache files in `/data/cache`, with
 `~/docker/docker-data/mcp-ddg-research` mounted into the container.
@@ -688,7 +813,6 @@ same Docker Hub and GHCR tags.
 These are optional future improvements, not current behavior:
 
 - Add configurable per-domain fetch throttling.
-- Add cache pruning utilities.
 - Add optional robots.txt awareness.
 - Add additional text extraction heuristics for common article layouts.
 - Add more integration tests around redirect chains and text content types.

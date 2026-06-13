@@ -99,6 +99,18 @@ def test_tool_schema_describes_deep_search_fetch_controls() -> None:
     assert "Per-call concurrent page fetch limit" in properties["max_concurrency"]["description"]
 
 
+def test_cache_tools_are_listed_with_described_arguments() -> None:
+    schemas = asyncio.run(_tool_schemas_by_name())
+
+    assert "cache_stats" in schemas
+    assert "cache_prune" in schemas
+    assert "cache_clear" in schemas
+    assert "dry_run" in schemas["cache_prune"]["properties"]
+    assert "without deleting" in schemas["cache_prune"]["properties"]["dry_run"]["description"]
+    assert "namespace" in schemas["cache_clear"]["properties"]
+    assert "confirm" in schemas["cache_clear"]["properties"]
+
+
 async def _tool_schemas_by_name() -> dict:
     tools = await mcp.list_tools()
     return {tool.name: tool.inputSchema for tool in tools}

@@ -9,6 +9,7 @@ from mcp_ddg_research.domains import normalize_domains
 SafeSearch = Literal["off", "moderate", "strict"]
 TimeFilter = Literal["day", "week", "month", "year"]
 SearchProvider = Literal["ddgs", "duckduckgo_html"]
+CacheNamespace = Literal["search", "fetch", "all"]
 
 ARGUMENT_DESCRIPTIONS = {
     "query": "DuckDuckGo search query text.",
@@ -43,6 +44,13 @@ ARGUMENT_DESCRIPTIONS = {
         "Per-call concurrent page fetch limit for ddg_deep_search. If omitted, MAX_CONCURRENCY "
         "from the environment is used."
     ),
+    "expired_only": (
+        "When true, cache_prune deletes only expired, corrupt, or temporary cache files and skips "
+        "size-limit pruning."
+    ),
+    "dry_run": "When true, cache_prune reports files that would be deleted without deleting them.",
+    "namespace": "Cache namespace to clear: search, fetch, or all.",
+    "confirm": "Must be true for cache_clear to delete cache files.",
 }
 
 
@@ -149,6 +157,19 @@ class DeepSearchRequest(StrictBaseModel):
     @classmethod
     def normalize_domain_options(cls, values: list[str]) -> list[str]:
         return normalize_domains(values)
+
+
+class CachePruneRequest(StrictBaseModel):
+    expired_only: bool = Field(
+        default=False,
+        description=ARGUMENT_DESCRIPTIONS["expired_only"],
+    )
+    dry_run: bool = Field(default=False, description=ARGUMENT_DESCRIPTIONS["dry_run"])
+
+
+class CacheClearRequest(StrictBaseModel):
+    namespace: CacheNamespace = Field(description=ARGUMENT_DESCRIPTIONS["namespace"])
+    confirm: bool = Field(description=ARGUMENT_DESCRIPTIONS["confirm"])
 
 
 class SearchResult(StrictBaseModel):

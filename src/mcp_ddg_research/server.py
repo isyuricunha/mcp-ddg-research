@@ -11,9 +11,15 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
 
+from mcp_ddg_research import cache as cache_ops
 from mcp_ddg_research.fetch import ddg_deep_search as perform_deep_search
 from mcp_ddg_research.fetch import web_fetch as perform_web_fetch
-from mcp_ddg_research.models import ARGUMENT_DESCRIPTIONS, SafeSearch, TimeFilter
+from mcp_ddg_research.models import (
+    ARGUMENT_DESCRIPTIONS,
+    CacheNamespace,
+    SafeSearch,
+    TimeFilter,
+)
 from mcp_ddg_research.search import ddg_search as perform_ddg_search
 
 LOGGER = logging.getLogger(__name__)
@@ -263,7 +269,61 @@ async def ddg_deep_search(
     return response.model_dump(mode="json")
 
 
+@mcp.tool()
+async def cache_stats() -> dict:
+    """Return cache file counts and byte totals for each cache namespace."""
+
+    return cache_ops.get_cache_stats().to_dict()
+
+
+@mcp.tool()
+async def cache_prune(
+    expired_only: Annotated[
+        bool,
+        Field(description=ARGUMENT_DESCRIPTIONS["expired_only"]),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        Field(description=ARGUMENT_DESCRIPTIONS["dry_run"]),
+    ] = False,
+) -> dict:
+    """Prune expired, corrupt, temporary, and oversized cache files."""
+
+    return cache_ops.prune_cache(expired_only=expired_only, dry_run=dry_run).to_dict()
+
+
+@mcp.tool()
+async def cache_clear(
+    namespace: Annotated[
+        CacheNamespace,
+        Field(description=ARGUMENT_DESCRIPTIONS["namespace"]),
+    ],
+    confirm: Annotated[
+        bool,
+        Field(description=ARGUMENT_DESCRIPTIONS["confirm"]),
+    ],
+) -> dict:
+    """Clear one cache namespace, or all namespaces, when confirm is true."""
+
+    return cache_ops.clear_cache(namespace=namespace, confirm=confirm).to_dict()
+
+
+def _prune_cache_on_startup() -> None:
+    try:
+        stats = cache_ops.prune_cache_on_startup()
+    except Exception:  # noqa: BLE001 - cache pruning must not block server startup.
+        LOGGER.warning("Startup cache pruning failed", exc_info=True)
+        return
+    if stats is not None and stats.deleted_files:
+        LOGGER.info(
+            "Pruned %s cache files on startup (%s bytes)",
+            stats.deleted_files,
+            stats.deleted_bytes,
+        )
+
+
 def main() -> None:
+    _prune_cache_on_startup()
     transport = os.getenv("MCP_TRANSPORT", "stdio").strip().lower()
     if transport == "http":
         import asyncio
