@@ -178,7 +178,7 @@ async def ddg_search(
         Field(description=ARGUMENT_DESCRIPTIONS["preferred_domains"]),
     ] = None,
 ) -> dict:
-    """Search DuckDuckGo using ddgs first, then the HTML fallback."""
+    """Search DuckDuckGo using the configured provider mode."""
 
     response = await perform_ddg_search(
         query=query,

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-ddg-research"
-version = "0.5.0"
-description = "Lightweight MCP server for DuckDuckGo search with HTML fallback, safe webpage fetching, caching, and clean text extraction."
+version = "0.5.1"
+description = "Lightweight MCP server for DuckDuckGo HTML search with optional ddgs mode, safe webpage fetching, caching, and clean text extraction."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }

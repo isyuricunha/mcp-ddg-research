@@ -185,7 +185,7 @@ jobs:
             ${{ steps.image.outputs.ghcr_image }}:${{ needs.release.outputs.release_tag }}
           labels: |
             org.opencontainers.image.title=mcp-ddg-research
-            org.opencontainers.image.description=Lightweight MCP server for DuckDuckGo search with HTML fallback, safe webpage fetching, caching, and clean text extraction.
+            org.opencontainers.image.description=Lightweight MCP server for DuckDuckGo HTML search with optional ddgs mode, safe webpage fetching, caching, and clean text extraction.
             org.opencontainers.image.version=${{ needs.release.outputs.release_tag }}
             org.opencontainers.image.created=${{ steps.image.outputs.created }}
             org.opencontainers.image.revision=${{ needs.release.outputs.release_commit_sha }}

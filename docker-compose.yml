@@ -15,6 +15,10 @@ services:
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8000"
 
+      # DuckDuckGo-only search defaults. ddgs can be enabled explicitly; see README.
+      SEARCH_PROVIDER: duckduckgo_html
+      DDGS_BACKEND: duckduckgo
+
       # Required for HTTP mode in this compose file. Replace before exposing
       # the service outside a trusted local network.
       MCP_AUTH_TOKEN: change-me-now

@@ -1,16 +1,16 @@
 # mcp-ddg-research
 
-Lightweight MCP server for DuckDuckGo search with HTML fallback, safe webpage fetching, caching, and clean text extraction.
+Lightweight MCP server for DuckDuckGo HTML search with optional ddgs mode, safe webpage fetching, caching, and clean text extraction.
 
-`mcp-ddg-research` is a self-hosted Python MCP server that exposes deterministic research primitives to MCP clients. It can run DuckDuckGo searches, fall back to DuckDuckGo's lightweight HTML endpoint when the `ddgs` provider fails, fetch webpages with SSRF protections, cache search/fetch responses, deduplicate URLs, and extract readable text from HTML pages.
+`mcp-ddg-research` is a self-hosted Python MCP server that exposes deterministic research primitives to MCP clients. By default it searches DuckDuckGo through DuckDuckGo's lightweight HTML endpoint, fetches webpages with SSRF protections, caches search/fetch responses, deduplicates URLs, and extracts readable text from HTML pages. The optional `ddgs` provider can be enabled explicitly for DuckDuckGo-backed or broader metasearch behavior.
 
 The MCP client or agent is responsible for reasoning over the returned data. This server only returns structured search results and fetched page text.
 
 ## What This Project Does
 
-- Searches DuckDuckGo through `ddgs.DDGS().text(...)`.
-- Falls back to `https://html.duckduckgo.com/html/` when `ddgs` fails, times out, rate limits, raises, or returns no results.
-- Parses DuckDuckGo HTML fallback results with BeautifulSoup.
+- Searches DuckDuckGo through the DuckDuckGo HTML endpoint by default.
+- Can optionally use `ddgs.DDGS().text(...)` when `SEARCH_PROVIDER=ddgs` or as a fallback when `SEARCH_PROVIDER=auto`.
+- Parses DuckDuckGo HTML results with BeautifulSoup.
 - Resolves DuckDuckGo redirect URLs such as `/l/?uddg=...`.
 - Deduplicates normalized result URLs.
 - Fetches webpages with strict URL and DNS safety checks.
@@ -31,11 +31,84 @@ The MCP client or agent is responsible for reasoning over the returned data. Thi
 - No ranking with model endpoints.
 - No OpenAI, Anthropic, Ollama, LM Studio, or other model endpoint support.
 
-## Why HTML Fallback Exists
+## Why DuckDuckGo HTML Is Default
 
-The `ddgs` package is the preferred provider because it offers a simple Python API and handles DuckDuckGo search details for normal use. Search providers can still fail because of network timeouts, temporary provider errors, rate limits, empty responses, dependency import problems, or upstream behavior changes.
+The project is DuckDuckGo-focused by default. `SEARCH_PROVIDER=duckduckgo_html`
+uses only:
 
-When that happens, this server falls back to DuckDuckGo's lightweight HTML endpoint. The fallback uses conservative request defaults, browser-like headers, and BeautifulSoup selectors for `.result`, `.result__a`, and `.result__snippet`.
+```text
+https://html.duckduckgo.com/html/
+```
+
+This keeps default behavior predictable and avoids surprising requests to other
+upstream search services. The HTML provider uses conservative request defaults,
+browser-like headers, and BeautifulSoup selectors for `.result`, `.result__a`,
+and `.result__snippet`.
+
+The `ddgs` package remains available as an opt-in provider. Current `ddgs`
+versions are broader metasearch libraries, not only DuckDuckGo clients. With
+`DDGS_BACKEND=auto`, `ddgs` may query multiple upstream services depending on
+the installed package, such as Brave, Google, Yahoo, Startpage, Yandex, Mojeek,
+Wikipedia, or Grokipedia. That can increase coverage, but it can also increase
+captcha or rate-limit noise. Use it only when broader search is intentional.
+
+## Search Provider Modes
+
+Default DuckDuckGo-only mode:
+
+```yaml
+SEARCH_PROVIDER: duckduckgo_html
+DDGS_BACKEND: duckduckgo
+```
+
+Behavior:
+
+- Uses only DuckDuckGo's HTML endpoint.
+- Does not import or call `ddgs`.
+- Returns `"provider": "duckduckgo_html"`.
+- This is the default and recommended mode for predictable DuckDuckGo-focused use.
+
+Optional `ddgs` mode using the DuckDuckGo backend:
+
+```yaml
+SEARCH_PROVIDER: ddgs
+DDGS_BACKEND: duckduckgo
+```
+
+Behavior:
+
+- Uses `DDGS().text(...)`.
+- Passes `backend="duckduckgo"` when supported by the installed `ddgs` package.
+- Returns `"provider": "ddgs"`.
+
+Optional broader metasearch mode:
+
+```yaml
+SEARCH_PROVIDER: ddgs
+DDGS_BACKEND: auto
+```
+
+Behavior:
+
+- Uses `DDGS().text(...)` with `backend="auto"`.
+- May query multiple upstream search providers depending on the installed `ddgs`
+  package.
+- Can increase coverage, but may also increase captcha/rate-limit noise.
+- This mode is always opt-in.
+
+Auto fallback mode:
+
+```yaml
+SEARCH_PROVIDER: auto
+DDGS_BACKEND: duckduckgo
+```
+
+Behavior:
+
+- Tries DuckDuckGo HTML first.
+- Falls back to `ddgs` only if DuckDuckGo HTML fails, times out, raises, or
+  returns no results.
+- The response `provider` reports the provider that returned results.
 
 ## Available MCP Tools
 
@@ -76,7 +149,7 @@ Response example:
 ```json
 {
   "query": "python mcp server fastmcp",
-  "provider": "ddgs",
+  "provider": "duckduckgo_html",
   "results": [
     {
       "title": "MCP Python SDK",
@@ -165,7 +238,7 @@ Response example:
 ```json
 {
   "query": "model context protocol python sdk",
-  "search_provider": "ddgs",
+  "search_provider": "duckduckgo_html",
   "sources": [
     {
       "title": "MCP Python SDK",
@@ -425,6 +498,13 @@ CACHE_MAX_AGE_SECONDS: "604800"
 CACHE_MAX_SIZE_MB: "512"
 ```
 
+The compose file keeps search DuckDuckGo-only by default:
+
+```yaml
+SEARCH_PROVIDER: duckduckgo_html
+DDGS_BACKEND: duckduckgo
+```
+
 The checked-in compose token is the placeholder `change-me-now`. It is
 acceptable for local smoke tests only. Replace `MCP_AUTH_TOKEN` in
 `docker-compose.yml` before using LAN, VPN, reverse-proxy, or Cloudflare Tunnel
@@ -615,9 +695,11 @@ Authorization header, `ListTools` and `CallTool` should work for `ddg_search`,
 | Variable | Default | Description |
 | --- | --- | --- |
 | `MCP_CACHE_DIR` | `/data/cache` | Directory for JSON cache files. |
+| `SEARCH_PROVIDER` | `duckduckgo_html` | Search provider mode: `duckduckgo_html`, `ddgs`, or `auto`. Invalid values safely fall back to `duckduckgo_html`. |
+| `DDGS_BACKEND` | `duckduckgo` | Backend passed to `DDGS().text(...)` when `SEARCH_PROVIDER=ddgs` or `SEARCH_PROVIDER=auto`. `duckduckgo` keeps `ddgs` DuckDuckGo-focused when supported. `auto` is broader metasearch mode and may query multiple upstream providers. Invalid values safely fall back to `duckduckgo`. |
 | `DDG_CACHE_TTL_SECONDS` | `21600` | Search cache TTL in seconds. |
 | `FETCH_CACHE_TTL_SECONDS` | `7200` | Web fetch cache TTL in seconds. |
-| `DDG_TIMEOUT_SECONDS` | `15` | DuckDuckGo provider and fallback timeout in seconds. |
+| `DDG_TIMEOUT_SECONDS` | `15` | DuckDuckGo HTML and optional `ddgs` provider timeout in seconds. |
 | `FETCH_TIMEOUT_SECONDS` | `15` | Web fetch timeout in seconds. |
 | `MAX_CONCURRENCY` | `5` | Default deep search page fetch concurrency limit when `max_concurrency` is omitted. Runtime caps this at `12`. |
 | `MCP_TRANSPORT` | `stdio` | MCP transport. `stdio` is the default. `http` uses streamable HTTP when supported by the installed SDK. |
@@ -678,6 +760,8 @@ Defaults are intentionally conservative:
 - `ddg_deep_search` defaults to 5 fetched pages and caps at 10.
 - Deep search concurrency defaults to 5.
 - Search and fetch results are cached to reduce repeated DuckDuckGo and website hits.
+- Search defaults to DuckDuckGo HTML only. `DDGS_BACKEND=auto` is broader
+  metasearch and can generate requests to additional upstream services.
 
 This project does not rotate proxies, bypass captchas, or attempt to evade rate limits. If DuckDuckGo blocks or rate limits requests, the tool returns structured errors instead of retrying aggressively.
 
@@ -801,8 +885,8 @@ same Docker Hub and GHCR tags.
 
 ## Limitations
 
-- DuckDuckGo HTML fallback does not support every option exposed by DuckDuckGo's full web interface.
-- `time_filter` is applied to the `ddgs` provider. The HTML fallback only sends the query and safe-search parameter.
+- DuckDuckGo HTML mode does not support every option exposed by DuckDuckGo's full web interface.
+- `time_filter` is applied to the `ddgs` provider. DuckDuckGo HTML mode only sends the query and safe-search parameter.
 - PDF parsing is not implemented in v1.
 - JavaScript-rendered pages are not rendered because there is no browser automation.
 - Some websites block automated HTTP clients or return incomplete content.

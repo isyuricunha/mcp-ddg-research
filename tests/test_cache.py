@@ -223,18 +223,24 @@ def test_search_still_uses_cache_if_pruning_fails(monkeypatch, tmp_path) -> None
     request = SearchRequest(query="example")
     response = SearchResponse(
         query="example",
-        provider="ddgs",
+        provider="duckduckgo_html",
         results=[],
         cached=False,
         error=None,
     )
-    cache.set(request.model_dump(mode="json"), response.model_dump(mode="json"))
+    payload = request.model_dump(mode="json")
+    payload["_provider"] = "duckduckgo_html"
+    cache.set(payload, response.model_dump(mode="json"))
 
     def fail_prune(*args, **kwargs):
         raise OSError("prune failed")
 
+    async def fail_html(*args, **kwargs):
+        raise AssertionError("search provider should not run on cache hit")
+
     monkeypatch.setattr("mcp_ddg_research.cache.prune_cache", fail_prune)
     monkeypatch.setattr("mcp_ddg_research.cache._LAST_PRUNE_TIMES", {})
+    monkeypatch.setattr("mcp_ddg_research.search._search_with_duckduckgo_html", fail_html)
 
     cached_response = asyncio.run(ddg_search(query="example", cache=cache))
 
