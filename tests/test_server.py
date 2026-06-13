@@ -71,6 +71,39 @@ def test_bearer_token_middleware_accepts_valid_authorization() -> None:
     assert messages[0]["status"] == 200
 
 
+def test_tool_schema_describes_search_window_as_result_count() -> None:
+    schemas = asyncio.run(_tool_schemas_by_name())
+
+    search_window = schemas["ddg_search"]["properties"]["search_window"]
+    deep_search_window = schemas["ddg_deep_search"]["properties"]["search_window"]
+
+    assert "Internal provider result count" in search_window["description"]
+    assert "not a time range or number of days" in search_window["description"]
+    assert deep_search_window["description"] == search_window["description"]
+
+
+def test_tool_schema_describes_domain_controls() -> None:
+    schemas = asyncio.run(_tool_schemas_by_name())
+    properties = schemas["ddg_search"]["properties"]
+
+    assert "Exclusive domain allowlist" in properties["allowed_domains"]["description"]
+    assert "Exclusion list" in properties["blocked_domains"]["description"]
+    assert "not exclusive filtering" in properties["preferred_domains"]["description"]
+
+
+def test_tool_schema_describes_deep_search_fetch_controls() -> None:
+    schemas = asyncio.run(_tool_schemas_by_name())
+    properties = schemas["ddg_deep_search"]["properties"]
+
+    assert "Number of top search result pages" in properties["max_pages"]["description"]
+    assert "Per-call concurrent page fetch limit" in properties["max_concurrency"]["description"]
+
+
+async def _tool_schemas_by_name() -> dict:
+    tools = await mcp.list_tools()
+    return {tool.name: tool.inputSchema for tool in tools}
+
+
 async def _call_middleware(middleware, headers):
     messages = []
     scope = {"type": "http", "method": "GET", "path": "/mcp", "headers": headers}

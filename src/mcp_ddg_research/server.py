@@ -5,13 +5,15 @@ from __future__ import annotations
 import logging
 import os
 from hmac import compare_digest
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import Field
 
 from mcp_ddg_research.fetch import ddg_deep_search as perform_deep_search
 from mcp_ddg_research.fetch import web_fetch as perform_web_fetch
+from mcp_ddg_research.models import ARGUMENT_DESCRIPTIONS, SafeSearch, TimeFilter
 from mcp_ddg_research.search import ddg_search as perform_ddg_search
 
 LOGGER = logging.getLogger(__name__)
@@ -140,14 +142,35 @@ async def _run_http_async() -> None:
 
 @mcp.tool()
 async def ddg_search(
-    query: str,
-    max_results: int = 10,
-    search_window: int | None = None,
-    safe_search: str = "off",
-    time_filter: str | None = None,
-    blocked_domains: list[str] | None = None,
-    allowed_domains: list[str] | None = None,
-    preferred_domains: list[str] | None = None,
+    query: Annotated[str, Field(min_length=1, description=ARGUMENT_DESCRIPTIONS["query"])],
+    max_results: Annotated[
+        int,
+        Field(ge=1, le=30, description=ARGUMENT_DESCRIPTIONS["max_results"]),
+    ] = 10,
+    search_window: Annotated[
+        int | None,
+        Field(ge=1, le=100, description=ARGUMENT_DESCRIPTIONS["search_window"]),
+    ] = None,
+    safe_search: Annotated[
+        SafeSearch,
+        Field(description=ARGUMENT_DESCRIPTIONS["safe_search"]),
+    ] = "off",
+    time_filter: Annotated[
+        TimeFilter | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["time_filter"]),
+    ] = None,
+    blocked_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["blocked_domains"]),
+    ] = None,
+    allowed_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["allowed_domains"]),
+    ] = None,
+    preferred_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["preferred_domains"]),
+    ] = None,
 ) -> dict:
     """Search DuckDuckGo using ddgs first, then the HTML fallback."""
 
@@ -165,7 +188,13 @@ async def ddg_search(
 
 
 @mcp.tool()
-async def web_fetch(url: str, max_chars: int = 12000) -> dict:
+async def web_fetch(
+    url: Annotated[str, Field(min_length=1, description=ARGUMENT_DESCRIPTIONS["url"])],
+    max_chars: Annotated[
+        int,
+        Field(ge=1000, le=50000, description=ARGUMENT_DESCRIPTIONS["max_chars"]),
+    ] = 12000,
+) -> dict:
     """Fetch one HTTP(S) page safely and return extracted text."""
 
     response = await perform_web_fetch(url=url, max_chars=max_chars)
@@ -174,17 +203,47 @@ async def web_fetch(url: str, max_chars: int = 12000) -> dict:
 
 @mcp.tool()
 async def ddg_deep_search(
-    query: str,
-    max_results: int = 10,
-    search_window: int | None = None,
-    max_pages: int = 5,
-    max_chars_per_page: int = 12000,
-    safe_search: str = "off",
-    time_filter: str | None = None,
-    blocked_domains: list[str] | None = None,
-    allowed_domains: list[str] | None = None,
-    preferred_domains: list[str] | None = None,
-    max_concurrency: int | None = None,
+    query: Annotated[str, Field(min_length=1, description=ARGUMENT_DESCRIPTIONS["query"])],
+    max_results: Annotated[
+        int,
+        Field(ge=1, le=30, description=ARGUMENT_DESCRIPTIONS["max_results"]),
+    ] = 10,
+    search_window: Annotated[
+        int | None,
+        Field(ge=1, le=100, description=ARGUMENT_DESCRIPTIONS["search_window"]),
+    ] = None,
+    max_pages: Annotated[
+        int,
+        Field(ge=1, le=10, description=ARGUMENT_DESCRIPTIONS["max_pages"]),
+    ] = 5,
+    max_chars_per_page: Annotated[
+        int,
+        Field(ge=1000, le=50000, description=ARGUMENT_DESCRIPTIONS["max_chars_per_page"]),
+    ] = 12000,
+    safe_search: Annotated[
+        SafeSearch,
+        Field(description=ARGUMENT_DESCRIPTIONS["safe_search"]),
+    ] = "off",
+    time_filter: Annotated[
+        TimeFilter | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["time_filter"]),
+    ] = None,
+    blocked_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["blocked_domains"]),
+    ] = None,
+    allowed_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["allowed_domains"]),
+    ] = None,
+    preferred_domains: Annotated[
+        list[str] | None,
+        Field(description=ARGUMENT_DESCRIPTIONS["preferred_domains"]),
+    ] = None,
+    max_concurrency: Annotated[
+        int | None,
+        Field(ge=1, le=12, description=ARGUMENT_DESCRIPTIONS["max_concurrency"]),
+    ] = None,
 ) -> dict:
     """Search once, fetch top pages in parallel, and return raw page text."""
 

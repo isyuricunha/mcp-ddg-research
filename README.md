@@ -62,7 +62,8 @@ Argument rules:
 - `query`: string, required.
 - `max_results`: integer, default `10`, minimum `1`, maximum `30`.
 - `search_window`: optional integer, minimum `1`, maximum `100`. If provided,
-  this is the provider request size before dedupe/domain controls/final cap.
+  this is the internal search result window, meaning the provider result count
+  requested before dedupe/domain controls/final cap. It is not a time window.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
 - `time_filter`: optional, one of `day`, `week`, `month`, `year`.
 - `blocked_domains`: optional list of domains to remove from results, default `[]`.
@@ -147,7 +148,8 @@ Argument rules:
 - `query`: string, required.
 - `max_results`: integer, default `10`, minimum `1`, maximum `30`.
 - `search_window`: optional integer, minimum `1`, maximum `100`. Passed through
-  to `ddg_search` as the provider request size before final result capping.
+  to `ddg_search` as the internal search result window before final result
+  capping. It is not a time window.
 - `max_pages`: integer, default `5`, minimum `1`, maximum `10`.
 - `max_chars_per_page`: integer, default `12000`, minimum `1000`, maximum `50000`.
 - `safe_search`: one of `off`, `moderate`, `strict`, default `off`.
@@ -192,17 +194,18 @@ default ranking order after URL deduplication. The server does not apply a
 built-in source bias, source boost, or domain blocklist.
 
 When any domain control is provided, the server requests a larger internal
-window from the provider before applying dedupe and domain controls. The default
-window is:
+search result window from the provider before applying dedupe and domain
+controls. The default provider result window is:
 
 ```text
 min(max_results * 3, 50)
 ```
 
 The final response is still capped to `max_results`. You can override the
-provider request size with `search_window`, minimum `1`, maximum `100`. This is
-useful when a desired allowed/preferred domain might appear outside the first
-`max_results` provider results.
+provider result window with `search_window`, minimum `1`, maximum `100`. This is
+a count of search results requested from DuckDuckGo, not a recency or day range.
+It is useful when a desired allowed/preferred domain might appear outside the
+first `max_results` provider results.
 
 Domain inputs are normalized by lowercasing, removing URL schemes, removing
 paths and query strings, and stripping a leading `www.`. Matching supports exact
@@ -246,7 +249,7 @@ Prefer domains without excluding others:
 }
 ```
 
-Search a larger internal window before applying domain controls:
+Search a larger internal search result window before applying domain controls:
 
 ```json
 {
@@ -257,7 +260,7 @@ Search a larger internal window before applying domain controls:
 }
 ```
 
-Deep search with the same search window behavior:
+Deep search with the same provider result window behavior:
 
 ```json
 {

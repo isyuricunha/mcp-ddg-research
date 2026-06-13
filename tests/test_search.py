@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from mcp_ddg_research.cache import JsonFileCache
 from mcp_ddg_research.fetch import ddg_deep_search, get_max_concurrency
-from mcp_ddg_research.models import DeepSearchRequest, SearchRequest, SearchResponse
+from mcp_ddg_research.models import DeepSearchRequest, FetchRequest, SearchRequest, SearchResponse
 from mcp_ddg_research.search import (
     _search_with_ddgs,
     ddg_search,
@@ -63,6 +63,22 @@ def test_search_request_rejects_invalid_search_window() -> None:
 def test_search_request_rejects_invalid_safe_search() -> None:
     with pytest.raises(ValidationError):
         SearchRequest(query="example", safe_search="disabled")
+
+
+def test_request_models_include_argument_descriptions() -> None:
+    search_schema = SearchRequest.model_json_schema()
+    fetch_schema = FetchRequest.model_json_schema()
+    deep_search_schema = DeepSearchRequest.model_json_schema()
+
+    assert (
+        "not a time range or number of days"
+        in search_schema["properties"]["search_window"]["description"]
+    )
+    assert "SSRF protections" in fetch_schema["properties"]["url"]["description"]
+    assert (
+        "Per-call concurrent page fetch limit"
+        in deep_search_schema["properties"]["max_concurrency"]["description"]
+    )
 
 
 def test_deep_search_request_accepts_max_concurrency() -> None:
